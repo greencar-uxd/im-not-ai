@@ -48,9 +48,9 @@ Codex 협업 에이전트를 사용할 수 있으면 역할별로 별도 에이�
 
 ## Light
 
-1. 진단 없이 monolith 역할을 한 번 실행한다. 입력은 `01_input_with_metrics.txt`, 룰북은 `quick-rules.md`, 강도는 보수다.
+1. 진단 없이 monolith 역할을 한 번 실행한다. 입력은 `01_input_with_metrics.txt`, 룰북은 `quick-rules.md`, 강도는 적극이다(문장 터치율 25~29% 목표, 30% 미만).
 2. 공통 게이트를 실행한다.
-3. 변경률 5% 미만이고 finding이 거의 없으면 “이미 좋은 글”로 보고한다.
+3. finding이 적어도 “이미 좋은 글”로 끝내지 않는다. 문장 터치율 25~29%를 목표로 고친다.
 4. 게이트 exit 2면 결과를 채택하지 말고 보수 강도를 재강조해 monolith를 1회만 재실행한다.
 
 ## Standard

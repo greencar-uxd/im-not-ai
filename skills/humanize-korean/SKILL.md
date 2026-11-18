@@ -113,10 +113,10 @@ SKILL_ROOT="$(d="$(cd -P "${CLAUDE_SKILL_DIR}" && pwd)"; \
 어휘 티가 거의 없고 구조 티만 미미한 글. 목표는 **과윤문 방지**이지 많이 고치는 게 아니다.
 
 1. **진단 생략.** `humanize-monolith`를 `Agent` 도구로 1회 호출 — 청킹 없음.
-   - 입력: `input_path=01_input_with_metrics.txt`, `quick_rules_path=${CLAUDE_SKILL_DIR}/references/quick-rules.md`, `genre_hint`, 그리고 강도 지시 `보수`(내용 앵커 원형 보존, 원문에 없던 표현 삽입 금지, 확신 없는 구간은 그대로 둔다).
+   - 입력: `input_path=01_input_with_metrics.txt`, `quick_rules_path=${CLAUDE_SKILL_DIR}/references/quick-rules.md`, `genre_hint`, 그리고 강도 지시 `적극`(문장 터치율 25~29% 목표. 내용 앵커 원형 보존, 원문에 없던 표현 삽입 금지, 확신 없는 구간은 그대로 둔다).
    - 출력: `final.md` (본문 + `<!-- HUMANIZE-SUMMARY -->` 블록).
 2. Phase 2.5 변경률 게이트(Bash — LLM 콜 아님).
-3. **조기 종료 보고**: monolith 탐지가 거의 없고 게이트 변경률이 5% 미만이면, 결과 전달을 "이미 좋은 글입니다 — 손댄 곳은 {N}곳({요지}) 정도"로 요약한다. 억지로 더 고치지 않는다.
+3. **조기 종료 없음**: 탐지가 적어도 "이미 좋은 글입니다"로 끝내지 않는다. 문장 터치율 25~29%를 목표로 고친다.
 4. 게이트 exit 2(≥50%)일 때만 롤백 재실행 1회(이 경우 총 2콜). light에서 50%가 나오면 과윤문 사고이므로 재실행 지시에 보수 강도를 재강조한다.
 
 **콜 수: 1 (게이트 실패 시 최대 2).**
@@ -269,7 +269,7 @@ exit code로 분기한다 (0/1/2/3 의미는 기존 게이트와 동일):
 
 사용자에게 다음 4개를 반환:
 1. 한 줄 상태: `완료. 경로 {light|standard|heavy} / 변경률 X% / 등급 Y / 자체검증 N/6 통과` — 변경률은 **게이트 스크립트 출력값**을 그대로 쓴다
-2. 윤문본 본문 (마크다운 블록) — 단, light 조기 종료면 "이미 좋습니다 + 손댄 곳 요약"으로 대체 가능
+2. 윤문본 본문 (마크다운 블록)
 3. final.md 끝 `<!-- HUMANIZE-SUMMARY -->` 블록의 핵심 표 (메트릭 + 카테고리 탐지 + 자체검증)
 4. 등급 B 이하면 "heavy(`--strict`, 진단→윤문→finalize 3콜)로 재실행" 안내
 
@@ -288,7 +288,7 @@ exit code로 분기한다 (0/1/2/3 의미는 기존 게이트와 동일):
 ## 옵션 (인자 끝에 자연어로)
 
 - `장르: 칼럼|리포트|블로그|공적` — 장르 명시 (생략 시 자동 추정)
-- `강도: 보수|기본|적극` — 윤문 강도 (기본값: 기본. light 경로는 항상 보수)
+- `강도: 보수|기본|적극` — 윤문 강도 (기본값: 적극. light 경로도 적극. 목표는 문장 터치율 25~29%, 30% 미만)
 - `--strict` / `정밀 모드` — heavy 경로 강제 (route_hint 무시)
 - `가볍게` / `빠르게만` — light 경로 강제
 
@@ -299,8 +299,7 @@ exit code로 분기한다 (0/1/2/3 의미는 기존 게이트와 동일):
     ↓ [scripts/prepare_monolith_input.py — 정량 점수 shim, Bash 1회]
 00_metrics.json (route_hint 포함) + 01_input_with_metrics.txt
     ↓ route_hint (사용자 명시가 오버라이드)
-    ├─ light ──→ [humanize-monolith ×1, 보수] ──→ final.md ──→ [verify_gates.py]
-    │             (변경률 <5%면 "이미 좋습니다" 조기 종료 보고)
+    ├─ light ──→ [humanize-monolith ×1, 적극] ──→ final.md ──→ [verify_gates.py]
     ├─ standard → [humanize-diagnostician ×1] → 02_diagnosis.md
     │             ↓ [shim --diagnosis, Bash]
     │             [humanize-monolith ×1 — 단일 콜, 1만자급 포함] → final.md
@@ -321,7 +320,7 @@ exit code로 분기한다 (0/1/2/3 의미는 기존 게이트와 동일):
 
 | 경로 | LLM 콜 수 | 대상 | 비고 |
 |---|---|---|---|
-| light | **1** (게이트 실패 시 2) | 잘 쓴 글 — 어휘 티 0·구조 티 미미 | 진단·finalize 생략, 보수 강도 |
+| light | **1** (게이트 실패 시 2) | 잘 쓴 글 — 어휘 티 0·구조 티 미미 | 진단·finalize 생략, 적극 강도 |
 | standard | **2** (승급 시 3) | 보통의 AI 초안 | 진단 + 단일 윤문. 1만자도 단일 콜 |
 | heavy | **3** (청킹 시 2+N+1) | 중증 슬롭·초장문·증적 필요 | 완전한 진단→윤문→finalize |
 
